@@ -39,12 +39,13 @@ func main() {
 		if f.IsDir() {
 			continue
 		}
-		if !mp3Regexp.MatchString(f.Name()) {
+		if !mp3Regexp.MatchString(f.Name()) || f.Name() == "output.mp3" {
 			continue
 		}
 		//if _, err := mp3File.WriteString(f.Name()+"\n"); err != nil {
 		//	panic(err)
 		//}
+
 		if _, err := ffmpegFile.WriteString("file '" + f.Name() + "'\n"); err != nil {
 			panic(err)
 		}
@@ -52,6 +53,6 @@ func main() {
 
 	println("成功: 生成 list.txt")
 	println("请执行 2_create_mp3.exe")
-	time.Sleep(3 * time.Second)
+	time.Sleep(15 * time.Second)
 
 }

@@ -4,4 +4,6 @@
 list.txt
 *.jpg
 *.mp4
-test/
+test*/
+/*.mp3
+/*.mp4

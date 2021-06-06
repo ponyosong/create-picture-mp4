@@ -84,7 +84,7 @@ func main() {
 	if err != nil {
 		fmt.Printf("%s\n", err.Error())
 		println("失败: 生成 output.mp3")
-		time.Sleep(3 * time.Second)
+		time.Sleep(15 * time.Second)
 		return
 	}
 
@@ -92,6 +92,6 @@ func main() {
 	//fmt.Printf("The date is %s\n", string(out))
 
 	println("成功: 生成 output.mp3")
-	println("请执行生成 1.jpg 的封面后，执行: 3_make_mp4.exe")
-	time.Sleep(3 * time.Second)
+	println("请生成 1.jpg 的封面后，执行: 3_make_mp4.exe")
+	time.Sleep(15 * time.Second)
 }
