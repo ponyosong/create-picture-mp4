@@ -12,8 +12,12 @@ import (
 	"time"
 )
 
-var path string
-var durationRegexp = regexp.MustCompile(`Duration: \d{2}:\d{2}:\d{2}.\d{2}`)
+var (
+	path           string
+	listFilePath   string
+	durationRegexp = regexp.MustCompile(`Duration: \d{2}:\d{2}:\d{2}.\d{2}`)
+	fileNameRegexp = regexp.MustCompile(`file '(.+)'`)
+)
 
 func init() {
 	var err error
@@ -23,9 +27,11 @@ func init() {
 	}
 	println(path)
 
-	fileNotExistPanic(path + "\\list.txt")
+	listFilePath = path + "\\list.txt"
+	fileNotExistPanic(listFilePath)
 
 	fileExistDelete(path + "\\output.mp3")
+	fileExistDelete(path + "\\timePoint.txt")
 }
 
 func fileNotExistPanic(filePath string) {
@@ -47,7 +53,39 @@ func fileExistDelete(filePath string) {
 	}
 }
 
+func createFileForFfmpeg(content string) {
+	fileExistDelete("temp.txt")
+	ffmpegFile, err := os.Create("temp.txt")
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := ffmpegFile.Close(); err != nil {
+			panic(err)
+		}
+	}()
+	if _, err := ffmpegFile.WriteString("file '" + content + "'\n"); err != nil {
+		panic(err)
+	}
+}
+
 func main() {
+	//if genMp3() {
+	//	return
+	//}
+
+	if genTimePoint() {
+		return
+	}
+	//println(utf8.DecodeRuneInString(string(out)))
+	//fmt.Printf("The date is %s\n", string(out))
+
+	println("成功: 生成 output.mp3")
+	println("请生成 1.jpg 的封面后，执行: 3_make_mp4.exe")
+	time.Sleep(15 * time.Second)
+}
+
+func genMp3() bool {
 	var err error
 
 	args := "/C "
@@ -88,30 +126,85 @@ func main() {
 		fmt.Printf("%s\n", err.Error())
 		println("失败: 生成 output.mp3")
 		time.Sleep(15 * time.Second)
-		return
+		return true
+	}
+	return false
+}
+
+func genTimePoint() bool {
+	var totalSeconds int64
+
+	file, err := os.Open("list.txt")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	timePointFile, err := os.Create("timePoint.txt")
+	if err != nil {
+		panic(err)
 	}
 
-	//println(utf8.DecodeRuneInString(string(out)))
-	//fmt.Printf("The date is %s\n", string(out))
+	defer func() {
+		if err := timePointFile.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
-	println("成功: 生成 output.mp3")
-	println("请生成 1.jpg 的封面后，执行: 3_make_mp4.exe")
-	time.Sleep(15 * time.Second)
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		m := scanner.Text()
+		fmt.Println(m)
+		if fileNameRegexp.MatchString(m) {
+			name, err := ParseFileName(m)
+			fmt.Println(name)
+			if err != nil {
+				fmt.Printf("%s\n", err.Error())
+				continue
+			}
+
+			intTime, err := getDurationByFile(name)
+			if err != nil {
+				fmt.Printf("%s\n", err.Error())
+				continue
+			}
+			//println(intTime)
+			text := MarshalText(totalSeconds)
+			totalSeconds += intTime
+			s := fmt.Sprintf("%s %s\n", text, name)
+			if _, err := timePointFile.WriteString(s); err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+		return false
+	}
+
+	return true
 }
 
 func getDurationByFile(mp3FileName string) (int64, error) {
 	var err error
 	var currentSeconds int64
 
+	createFileForFfmpeg(mp3FileName)
+
 	args := "/C "
-	args += fmt.Sprintf("ffprobe %s", mp3FileName)
+	//args += fmt.Sprintf(`""ffprobe" "%s""`, mp3FileName)
+	args += fmt.Sprintf(`ffprobe -v error -select_streams a:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 "%s"`, mp3FileName)
+	//args += `""ffprobe" "temp.txt""`
+	println(args)
 	cmd := exec.Command("cmd", args)
 
 	stdErr, _ := cmd.StderrPipe()
 	stdOut, _ := cmd.StdoutPipe()
 	err = cmd.Start()
 	if err != nil {
-		panic(err)
+		return 0, err
 	}
 
 	scanner := bufio.NewScanner(stdOut)
@@ -120,6 +213,14 @@ func getDurationByFile(mp3FileName string) (int64, error) {
 		for scanner.Scan() {
 			m := scanner.Text()
 			fmt.Printf("%s\n", m)
+			if durationRegexp.MatchString(m) {
+				currentSeconds, err = ParseMp3Time(m)
+				if err != nil {
+					//println(m)
+					fmt.Printf("解析视频总时长出错，请联系管理员: %d\n", currentSeconds)
+					time.Sleep(30 * time.Minute)
+				}
+			}
 		}
 	}()
 
@@ -128,7 +229,7 @@ func getDurationByFile(mp3FileName string) (int64, error) {
 	go func() {
 		for scannerErr.Scan() {
 			m := scannerErr.Text()
-			//fmt.Printf("%s\n", m)
+			fmt.Printf("%s\n", m)
 			if durationRegexp.MatchString(m) {
 				currentSeconds, err = ParseMp3Time(m)
 				if err != nil {
@@ -136,8 +237,6 @@ func getDurationByFile(mp3FileName string) (int64, error) {
 					fmt.Printf("解析视频总时长出错，请联系管理员: %d\n", currentSeconds)
 					time.Sleep(30 * time.Minute)
 				}
-
-				//fmt.Printf("解析视频时长: %d\n", currentSeconds)
 			}
 		}
 	}()
@@ -145,11 +244,12 @@ func getDurationByFile(mp3FileName string) (int64, error) {
 	err = cmd.Wait()
 	if err != nil {
 		fmt.Printf("%s\n", err.Error())
-		println("失败: 生成 output.mp3")
+		println("失败: 获取时长")
 		time.Sleep(15 * time.Second)
-		return
+		return 0, err
 	}
 
+	return currentSeconds, nil
 }
 
 func MarshalText(dur int64) string {
@@ -173,4 +273,15 @@ func ParseMp3Time(s string) (int64, error) {
 	}
 	tT, _ := time.Parse("15:04:05.00", "00:00:00.00")
 	return t.Sub(tT).Milliseconds(), err
+}
+
+func ParseFileName(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	if len(s) < 7 {
+		return "", errors.New("长度错误:" + s)
+	}
+	s = s[6:]
+	s = s[:len(s)-1]
+
+	return s, nil
 }
