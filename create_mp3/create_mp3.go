@@ -7,31 +7,53 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
 
 var (
-	path           string
-	listFilePath   string
-	durationRegexp = regexp.MustCompile(`Duration: \d{2}:\d{2}:\d{2}.\d{2}`)
-	fileNameRegexp = regexp.MustCompile(`file '(.+)'`)
+	path              string
+	listFilePath      string
+	durationRegexp    = regexp.MustCompile(`Duration: \d{2}:\d{2}:\d{2}.\d{2}`)
+	secondFloatRegexp = regexp.MustCompile(`\d+\.\d+`)
+	fileNameRegexp    = regexp.MustCompile(`file '(.+)'`)
 )
+
+func chdir() {
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	exPath := filepath.Dir(ex)
+
+	err = os.Chdir(exPath)
+	if err != nil {
+		panic(err)
+	}
+}
 
 func init() {
 	var err error
+
+	chdir()
+
 	path, err = os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
 	println(path)
 
-	listFilePath = path + "\\list.txt"
+	//listFilePath = path + "\\list.txt"
+	listFilePath = path + "/list.txt"
 	fileNotExistPanic(listFilePath)
 
-	fileExistDelete(path + "\\output.mp3")
-	fileExistDelete(path + "\\timePoint.txt")
+	//fileExistDelete(path + "\\output.mp3")
+	fileExistDelete(path + "/output.mp3")
+	//fileExistDelete(path + "\\timePoint.txt")
+	fileExistDelete(path + "/timePoint.txt")
 }
 
 func fileNotExistPanic(filePath string) {
@@ -70,9 +92,9 @@ func createFileForFfmpeg(content string) {
 }
 
 func main() {
-	//if genMp3() {
-	//	return
-	//}
+	if genMp3() {
+		return
+	}
 
 	if genTimePoint() {
 		return
@@ -88,12 +110,14 @@ func main() {
 func genMp3() bool {
 	var err error
 
-	args := "/C "
-	args += "ffmpeg -f concat -safe 0 -i list.txt -c copy output.mp3"
+	// windows
+	//args := "/C "
+	args := ""
+	args += "-f concat -safe 0 -i list.txt -c copy output.mp3"
 	//args += fmt.Sprintf("ffmpeg -f concat -safe 0 -i list.txt -c copy output.mp3")
 	//args += fmt.Sprintf("ffprobe %s\\output.mp3", dir)
 	//args += fmt.Sprintf("ffprobe output.mp3")
-	cmd := exec.Command("cmd", strings.Split(args, " ")...)
+	cmd := exec.Command("ffmpeg", strings.Split(args, " ")...)
 
 	stdErr, _ := cmd.StderrPipe()
 	stdOut, _ := cmd.StdoutPipe()
@@ -155,10 +179,10 @@ func genTimePoint() bool {
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		m := scanner.Text()
-		fmt.Println(m)
+		//fmt.Println(m)
 		if fileNameRegexp.MatchString(m) {
 			name, err := ParseFileName(m)
-			fmt.Println(name)
+			//fmt.Println(name)
 			if err != nil {
 				fmt.Printf("%s\n", err.Error())
 				continue
@@ -169,9 +193,13 @@ func genTimePoint() bool {
 				fmt.Printf("%s\n", err.Error())
 				continue
 			}
-			//println(intTime)
-			text := MarshalText(totalSeconds)
+			//println(totalSeconds)
+			text := MarshalTextSecond(totalSeconds)
+			//fmt.Println(text)
 			totalSeconds += intTime
+			if text == "00:00:00" {
+				text = "00:00:01"
+			}
 			s := fmt.Sprintf("%s %s\n", text, name)
 			if _, err := timePointFile.WriteString(s); err != nil {
 				panic(err)
@@ -191,14 +219,21 @@ func getDurationByFile(mp3FileName string) (int64, error) {
 	var err error
 	var currentSeconds int64
 
-	createFileForFfmpeg(mp3FileName)
+	//createFileForFfmpeg(mp3FileName)
 
-	args := "/C "
-	//args += fmt.Sprintf(`""ffprobe" "%s""`, mp3FileName)
-	args += fmt.Sprintf(`ffprobe -v error -select_streams a:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 "%s"`, mp3FileName)
-	//args += `""ffprobe" "temp.txt""`
-	println(args)
-	cmd := exec.Command("cmd", args)
+	// windows
+	//args := "/C "
+	//args := ""
+	////args += fmt.Sprintf(`""ffprobe" "%s""`, mp3FileName)
+	//args += fmt.Sprintf(`ffprobe -v error -select_streams a:0 -show_entries stream=duration -of default=noprint_wrappers=1:nokey=1 "%s"`, mp3FileName)
+	////args += `""ffprobe" "temp.txt""`
+	//println(args)
+	//
+	//cmd := exec.Command("cmd", strings.Split(args, " ")...)
+	//cmd := exec.Command("ffprobe", mp3FileName)
+
+	s := []string{"-v", "error", "-select_streams", "a:0", "-show_entries", "stream=duration", "-of", "default=noprint_wrappers=1:nokey=1", mp3FileName}
+	cmd := exec.Command("ffprobe", s...)
 
 	stdErr, _ := cmd.StderrPipe()
 	stdOut, _ := cmd.StdoutPipe()
@@ -212,14 +247,23 @@ func getDurationByFile(mp3FileName string) (int64, error) {
 	go func() {
 		for scanner.Scan() {
 			m := scanner.Text()
-			fmt.Printf("%s\n", m)
-			if durationRegexp.MatchString(m) {
-				currentSeconds, err = ParseMp3Time(m)
+			//fmt.Printf("%s\n", m)
+
+			if secondFloatRegexp.MatchString(m) {
+
+				ff, err := strconv.ParseFloat(m, 32)
 				if err != nil {
-					//println(m)
 					fmt.Printf("解析视频总时长出错，请联系管理员: %d\n", currentSeconds)
 					time.Sleep(30 * time.Minute)
 				}
+
+				currentSeconds = int64(ff)
+				//currentSeconds, err = ParseMp3Time(m)
+				//if err != nil {
+				//	//println(m)
+				//	fmt.Printf("解析视频总时长出错，请联系管理员: %d\n", currentSeconds)
+				//	time.Sleep(30 * time.Minute)
+				//}
 			}
 		}
 	}()
@@ -229,14 +273,22 @@ func getDurationByFile(mp3FileName string) (int64, error) {
 	go func() {
 		for scannerErr.Scan() {
 			m := scannerErr.Text()
-			fmt.Printf("%s\n", m)
-			if durationRegexp.MatchString(m) {
-				currentSeconds, err = ParseMp3Time(m)
+			//fmt.Printf("%s\n", m)
+			if secondFloatRegexp.MatchString(m) {
+
+				ff, err := strconv.ParseFloat(m, 32)
 				if err != nil {
-					//println(m)
 					fmt.Printf("解析视频总时长出错，请联系管理员: %d\n", currentSeconds)
 					time.Sleep(30 * time.Minute)
 				}
+
+				currentSeconds = int64(ff)
+				//currentSeconds, err = ParseMp3Time(m)
+				//if err != nil {
+				//	//println(m)
+				//	fmt.Printf("解析视频总时长出错，请联系管理员: %d\n", currentSeconds)
+				//	time.Sleep(30 * time.Minute)
+				//}
 			}
 		}
 	}()
@@ -250,6 +302,14 @@ func getDurationByFile(mp3FileName string) (int64, error) {
 	}
 
 	return currentSeconds, nil
+}
+
+func MarshalTextSecond(dur int64) string {
+	h := dur / (3600 * 60)
+	m := dur % (3600 * 60) / (60)
+	s := dur % 60
+
+	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 }
 
 func MarshalText(dur int64) string {

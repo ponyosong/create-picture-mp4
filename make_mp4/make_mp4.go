@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -18,16 +19,22 @@ var timeRegexp = regexp.MustCompile(`^time=\d{2}:\d{2}:\d{2}.\d{2}`)
 
 func init() {
 	var err error
+
+	chdir()
+
 	path, err = os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
 	println(path)
 
-	fileNotExistPanic(path + "\\1.jpg")
-	fileNotExistPanic(path + "\\output.mp3")
+	//fileNotExistPanic(path + "\\1.jpg")
+	fileNotExistPanic(path + "/1.jpg")
+	//fileNotExistPanic(path + "\\output.mp3")
+	fileNotExistPanic(path + "/output.mp3")
 
-	fileExistDelete(path + "\\export.mp4")
+	//fileExistDelete(path + "\\export.mp4")
+	fileExistDelete(path + "/export.mp4")
 }
 
 func fileNotExistPanic(filePath string) {
@@ -49,13 +56,30 @@ func fileExistDelete(filePath string) {
 	}
 }
 
+func chdir() {
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	exPath := filepath.Dir(ex)
+
+	err = os.Chdir(exPath)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func main() {
 	var err error
 
-	args := "/C "
-	args += "ffmpeg -loop 1 -i 1.jpg -i output.mp3 -c:v libx264 -c:a copy -shortest export.mp4"
+	// windows
+	//args := "/C "
+	args := ""
+	//args += "-loop 1 -i 1.jpg -i output.mp3 -c:v libx264 -c:a copy -shortest export.mp4"
+	args += "-loop 1 -framerate 1 -i 1.jpg -i output.mp3 -c:v libx264 -preset veryslow -crf 0 -c:a copy -shortest export.mp4"
+	//args += "-r 1/5 -i 1.jpg -i output.mp3 -c:v libx264 -vf \"fps=1,format=yuv420p\" out.mp4"
 	//args += fmt.Sprintf("ffprobe output.mp3")
-	cmd := exec.Command("cmd", strings.Split(args, " ")...)
+	cmd := exec.Command("ffmpeg", strings.Split(args, " ")...)
 
 	stdErr, _ := cmd.StderrPipe()
 	stdOut, _ := cmd.StdoutPipe()

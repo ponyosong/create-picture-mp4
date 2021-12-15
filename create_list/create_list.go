@@ -4,22 +4,33 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"time"
 )
 
 var mp3Regexp = regexp.MustCompile(`\.mp3$`)
 
+func chdir() {
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	exPath := filepath.Dir(ex)
+
+	err = os.Chdir(exPath)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func main() {
+	chdir()
+
 	listFiles, err := ioutil.ReadDir("./")
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	//mp3File, err := os.Create("封面用.txt")
-	//if err != nil {
-	//	panic(err)
-	//}
 
 	ffmpegFile, err := os.Create("list.txt")
 	if err != nil {
@@ -27,9 +38,6 @@ func main() {
 	}
 
 	defer func() {
-		//if err := mp3File.Close(); err != nil {
-		//	panic(err)
-		//}
 		if err := ffmpegFile.Close(); err != nil {
 			panic(err)
 		}
@@ -42,10 +50,6 @@ func main() {
 		if !mp3Regexp.MatchString(f.Name()) || f.Name() == "output.mp3" {
 			continue
 		}
-		//if _, err := mp3File.WriteString(f.Name()+"\n"); err != nil {
-		//	panic(err)
-		//}
-
 		if _, err := ffmpegFile.WriteString("file '" + f.Name() + "'\n"); err != nil {
 			panic(err)
 		}
