@@ -305,8 +305,8 @@ func getDurationByFile(mp3FileName string) (int64, error) {
 }
 
 func MarshalTextSecond(dur int64) string {
-	h := dur / (3600 * 60)
-	m := dur % (3600 * 60) / (60)
+	h := dur / 3600
+	m := dur % 3600 / 60
 	s := dur % 60
 
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
