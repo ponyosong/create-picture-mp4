@@ -54,9 +54,9 @@ func init() {
 	fileNotExistPanic(listFilePath)
 
 	//fileExistDelete(path + "\\output.mp3")
-	fileExistDelete(path + "/output.mp3")
+	//fileExistDelete(path + "/output.mp3")
 	//fileExistDelete(path + "\\timePoint.txt")
-	fileExistDelete(path + "/timePoint.txt")
+	//fileExistDelete(path + "/timePoint.txt")
 	fileExistDelete(path + "/output.lrc")
 }
 
@@ -254,6 +254,7 @@ func genLyrics() bool {
 				fmt.Printf("%s\n", err.Error())
 				continue
 			}
+			name = DisposeSpecialCharacter(name)
 
 			intTime, err := getDurationByFileMs(name)
 			if err != nil {
@@ -614,4 +615,8 @@ func ParseLrcTime(s string) (int64, error) {
 
 func StringToInt64(s []byte) (int64, error) {
 	return strconv.ParseInt(string(s), 10, 64)
+}
+
+func DisposeSpecialCharacter(s string) string {
+	return strings.ReplaceAll(s, `'\''`, `'`)
 }

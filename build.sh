@@ -6,3 +6,5 @@ go build -o 2_create_mp3 create_mp3/create_mp3.go
 
 go build -o 3_make_mp4 make_mp4/make_mp4.go
 
+go build -o 4_make_lyrics create_lyrics/create_lyrics.go
+
